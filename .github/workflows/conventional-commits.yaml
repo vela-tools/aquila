@@ -1,0 +1,43 @@
+name: conventional-commits
+
+on:
+  pull_request:
+    branches: [main]
+    # edited reruns the title check when only the title changes.
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: conventional-commits-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  conventional-commits:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: webiny/action-conventional-commits@v1.4.2
+        with:
+          GITHUB_TOKEN: ${{ github.token }}
+
+  # A squash merge makes the title the subject of the commit on main, so it has to follow the
+  # same format as the commits.
+  title:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the pull request title
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          set -euo pipefail
+          pattern='^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test)(\([a-z0-9._/-]+\))?!?: [^ ].*$'
+          if [[ ! "$TITLE" =~ $pattern ]]; then
+            echo "The title \"${TITLE}\" is not a Conventional Commits subject, such as \"fix(editor): keep the expiry\"." >&2
+            exit 1
+          fi

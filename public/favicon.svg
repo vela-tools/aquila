@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Aquila</title>
+  <rect width="64" height="64" rx="14" fill="#7C3AED"/>
+  <path d="M9 17 L21 31 L32 35 L43 31 L55 17 M32 35 L32 53" stroke="#D8C6FF" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <g fill="#FFFFFF">
+    <circle cx="32" cy="35" r="6.5"/>
+    <circle cx="21" cy="31" r="3.6"/>
+    <circle cx="43" cy="31" r="3.6"/>
+    <circle cx="9" cy="17" r="3.4"/>
+    <circle cx="55" cy="17" r="3.4"/>
+    <circle cx="32" cy="53" r="3.6"/>
+  </g>
+</svg>

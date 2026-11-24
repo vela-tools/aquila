@@ -1,0 +1,167 @@
+name: release
+
+on:
+  push:
+    tags:
+      - v[0-9]+.[0-9]+.[0-9]+
+      - v[0-9]+.[0-9]+.[0-9]+-alpha.[0-9]+
+      - v[0-9]+.[0-9]+.[0-9]+-beta.[0-9]+
+      - v[0-9]+.[0-9]+.[0-9]+-rc.[0-9]+
+
+permissions:
+  contents: read
+
+env:
+  IMAGE: ghcr.io/vela-tools/aquila
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      latest: ${{ steps.type.outputs.latest }}
+      demote: ${{ steps.type.outputs.demote }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check that the tagged commit is on main
+        run: |
+          set -euo pipefail
+          commit="$(git rev-parse "${GITHUB_REF}^{commit}")"
+          if ! git merge-base --is-ancestor "$commit" origin/main; then
+            echo "${GITHUB_REF_NAME} points at ${commit}, which is not on main. Tag the release commit as it is on main." >&2
+            exit 1
+          fi
+
+      - name: Check that the tag matches the version in package.json
+        run: |
+          set -euo pipefail
+          version="$(jq -r .version package.json)"
+          if [[ "v${version}" != "${GITHUB_REF_NAME}" ]]; then
+            echo "package.json is at ${version}, the tag is ${GITHUB_REF_NAME}" >&2
+            exit 1
+          fi
+
+      - name: Determine release type
+        id: type
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          latest=true
+          if [[ "${GITHUB_REF_NAME}" == *-* ]]; then
+            stable=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/git/matching-refs/tags/v" \
+              --jq '.[].ref | select(test("^refs/tags/v[0-9]+\\.[0-9]+\\.[0-9]+$"))')
+            if [[ -n "$stable" ]]; then
+              latest=false
+            fi
+          fi
+          demote=false
+          if [[ "$latest" == true && "${GITHUB_REF_NAME}" == *-* ]]; then
+            demote=true
+          fi
+          echo "latest=${latest}" >> "$GITHUB_OUTPUT"
+          echo "demote=${demote}" >> "$GITHUB_OUTPUT"
+
+  image:
+    needs: plan
+    permissions:
+      artifact-metadata: write
+      attestations: write
+      contents: read
+      id-token: write
+      packages: write
+    uses: ./.github/workflows/docker.yaml
+
+  release:
+    needs: [plan, image]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Resolve the release notes range
+        id: notes
+        run: |
+          set -euo pipefail
+          range=""
+          if previous="$(git describe --tags --abbrev=0 --match 'v[0-9]*' --exclude '*-*' "${GITHUB_REF_NAME}^" 2>/dev/null)"; then
+            range="${previous}..${GITHUB_REF_NAME}"
+          fi
+          echo "range=${range}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate release notes
+        id: changelog
+        uses: orhun/git-cliff-action@v4
+        env:
+          GIT_CLIFF_TAG: ${{ github.ref_name }}
+        with:
+          config: cliff.toml
+          version: v2.14.2
+          args: ${{ steps.notes.outputs.range }} --strip all
+
+      - name: Compose release body
+        env:
+          NOTES: ${{ steps.changelog.outputs.content }}
+          DIGEST: ${{ needs.image.outputs.digest }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$DIGEST" ]]; then
+            echo "the image job returned no digest" >&2
+            exit 1
+          fi
+          printf '%s\n\n' "$NOTES" > release-body.md
+          {
+            echo "## Image"
+            echo
+            echo '```sh'
+            echo "docker pull ${IMAGE}:${GITHUB_REF_NAME}"
+            echo '```'
+            echo
+            echo "Multi-platform (\`linux/amd64\`, \`linux/arm64\`), digest \`${DIGEST}\`. Signed with cosign and carrying a build provenance attestation:"
+            echo
+            echo '```sh'
+            echo "gh attestation verify oci://${IMAGE}:${GITHUB_REF_NAME} --repo ${GITHUB_REPOSITORY}"
+            echo '```'
+          } >> release-body.md
+
+      - name: Create release
+        uses: ncipollo/release-action@v1
+        with:
+          allowUpdates: true
+          draft: false
+          makeLatest: ${{ needs.plan.outputs.latest }}
+          prerelease: ${{ needs.plan.outputs.latest != 'true' }}
+          name: ${{ github.ref_name }}
+          bodyFile: release-body.md
+          token: ${{ github.token }}
+
+      - name: Mark earlier releases as pre-releases
+        if: needs.plan.outputs.demote == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release list --repo "$GITHUB_REPOSITORY" --limit 1000 \
+            --json tagName,isPrerelease,isDraft \
+            --jq ".[] | select(.isPrerelease | not) | select(.isDraft | not) | select(.tagName != \"${GITHUB_REF_NAME}\") | .tagName" |
+            while read -r tag; do
+              gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --prerelease --latest=false
+            done
+
+  docs:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Publish the documentation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yaml --repo "$GITHUB_REPOSITORY" --ref main -f ref=main

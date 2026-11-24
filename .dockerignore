@@ -1,0 +1,14 @@
+.git/
+.github/
+.tanstack/
+docker/
+docs/
+test/
+dist/
+public/config.json
+node_modules/
+.env
+.env.*
+*.log
+Dockerfile
+.dockerignore

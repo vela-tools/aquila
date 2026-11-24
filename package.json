@@ -1,0 +1,67 @@
+{
+  "name": "aquila",
+  "private": true,
+  "version": "1.0.0-beta.1",
+  "license": "EUPL-1.2",
+  "type": "module",
+  "packageManager": "npm@11.20.0",
+  "engines": {
+    "node": "^22.22.2 || ^24.15.0 || >=26"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "typecheck": "tsc -b && tsc -p tsconfig.test.json",
+    "lint": "eslint . --max-warnings 0",
+    "test": "vitest run",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "audit:sources": "lockfile-lint && npm audit signatures",
+    "knip": "knip",
+    "seed": "node docker/seed.mjs",
+    "preview": "vite preview"
+  },
+  "browserslist": [
+    "baseline widely available"
+  ],
+  "allowScripts": {
+    "fsevents": false
+  },
+  "dependencies": {
+    "@mantine/core": "^9.8.2",
+    "@mantine/hooks": "^9.8.2",
+    "@phosphor-icons/react": "^2.1.10",
+    "@tanstack/react-query": "^5.108.4",
+    "@tanstack/react-router": "^1.170.46",
+    "@vela-tools/ngsi": "^1.0.0",
+    "@vela-tools/ngsi-client": "^1.0.0",
+    "@vela-tools/ui": "^1.0.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@tanstack/router-plugin": "^1.169.0",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.3.0",
+    "browserslist": "^4.29.6",
+    "browserslist-to-esbuild": "^2.1.1",
+    "eslint": "^10.15.0",
+    "eslint-plugin-compat": "^7.0.2",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.8",
+    "globals": "^17.14.0",
+    "jsdom": "^31.0.0",
+    "knip": "^6.48.0",
+    "lockfile-lint": "^5.1.0",
+    "prettier": "^3.10.1",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.74.0",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.0"
+  }
+}

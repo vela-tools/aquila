@@ -1,0 +1,25 @@
+# Dependency policy for the dependencies workflow. osv-scanner reads it for both the advisories and the
+# licences check. The allowed licences are passed with --licenses in .github/workflows/dependencies.yaml:
+# the allowed list of the Vela Tools licensing policy, plus the permissive licences it proposes for that
+# list (MIT-0, 0BSD, CC0-1.0, Unlicense, BSL-1.0, and OFL-1.1 for fonts) and BlueOak-1.0.0 and Python-2.0.
+# Every entry here states what it covers and why it is tolerable; an ignored advisory also carries
+# ignoreUntil, so it is re-checked.
+
+[[PackageOverrides]]
+group = "dev"
+license.ignore = true
+reason = "Development tooling is not in the container image or the built bundle, so its licence does not travel with Aquila. Its advisories are still checked."
+
+[[PackageOverrides]]
+name = "@vela-tools/.*"
+nameIsRegex = true
+ecosystem = "npm"
+license.ignore = true
+reason = "The Vela Tools packages, under EUPL-1.2. EUPL-1.2 is allowed for the project's own packages only, so it is not in the allowed list, where it would also admit third-party EUPL packages."
+
+[[PackageOverrides]]
+name = "@tanstack/react-query"
+version = "5.108.4"
+ecosystem = "npm"
+license.override = ["MIT"]
+reason = "Published on 2026-11-23 and not yet indexed by deps.dev, so osv-scanner reports its licence as unknown. Its package.json and LICENSE state MIT. The entry names this version only, so it stops applying with the next update; delete it then."

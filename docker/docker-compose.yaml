@@ -1,0 +1,82 @@
+name: aquila-test
+
+services:
+  postgres:
+    # Scorpio 6.0.1 bundles Flyway 11.12, which is tested up to PostgreSQL 17 and logs a warning on 19.
+    # Scorpio works on it all the same.
+    image: postgis/postgis:19-3.7@sha256:1ff6c313ac0264db5fe119a866c159a841093f5e15daa56fa8b64566f4bfb23c
+    # PostGIS publishes amd64 images only; ARM hosts run it emulated.
+    platform: linux/amd64
+    environment:
+      POSTGRES_USER: ngb
+      POSTGRES_PASSWORD: ngb
+      POSTGRES_DB: ngb
+    # From PostgreSQL 18, the image keeps its data in a subdirectory of /var/lib/postgresql and refuses to
+    # start with a volume mounted at /var/lib/postgresql/data.
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ngb -d ngb"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  scorpio:
+    image: scorpiobroker/all-in-one-runner:java-6.0.1@sha256:9910355d97f4976dd40fff9526db324a62da18c24a43eb4d5b5b05041bcc475f
+    environment:
+      DBHOST: postgres
+      DBUSER: ngb
+      DBPASS: ngb
+      DBNAME: ngb
+      QUARKUS_HTTP_CORS_ENABLED: "true"
+      QUARKUS_HTTP_CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:2361,http://localhost:2362}
+      # Without these, the browser hides the headers from Aquila: Link carries the JSON-LD context of
+      # an answer, and NGSILD-Results-Count the number of matching entities.
+      QUARKUS_HTTP_CORS_EXPOSED_HEADERS: Link,NGSILD-Results-Count
+    ports:
+      - "${SCORPIO_PORT:-9090}:9090"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  receiver:
+    image: node:26.13.1-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5
+    command: ["node", "/app/server.mjs"]
+    environment:
+      PORT: 8099
+      LOG_FILE: /data/notifications.jsonl
+      KEEP: ${RECEIVER_KEEP:-5000}
+    volumes:
+      - ./receiver:/app:ro
+      - receiver-data:/data
+    ports:
+      - "${RECEIVER_PORT:-8099}:8099"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8099/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  aquila:
+    profiles: ["app"]
+    build:
+      context: ..
+    image: aquila:local
+    environment:
+      AQUILA_BROKER_URL: ${AQUILA_BROKER_URL:-}
+      AQUILA_BROKER_NAME: ${AQUILA_BROKER_NAME:-Local Scorpio}
+    ports:
+      - "${AQUILA_PORT:-2362}:2361"
+    depends_on:
+      - scorpio
+      - receiver
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  receiver-data:
