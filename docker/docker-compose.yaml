@@ -4,7 +4,7 @@ services:
   postgres:
     # Scorpio 6.0.1 bundles Flyway 11.12, which is tested up to PostgreSQL 17 and logs a warning on 19.
     # Scorpio works on it all the same.
-    image: postgis/postgis:19-3.7@sha256:1ff6c313ac0264db5fe119a866c159a841093f5e15daa56fa8b64566f4bfb23c
+    image: postgis/postgis:19-3.7@sha256:fb3b0686833282d392a6af200c6c5234ed2d671ef372fa245106ec39b5c95945
     # PostGIS publishes amd64 images only; ARM hosts run it emulated.
     platform: linux/amd64
     environment:
